@@ -1,0 +1,289 @@
+```{r global_options, include=FALSE} 
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+# Catarina Jesus
+
+## 1. Introduction
+ 
+### Welcome to the Interactive Business Report of ArrrrConsulting!
+ 
+As a consulting group of analysts, programmers, and strategists, we have been engaged by Pavel Travel Agency to drive improvements in their sales, marketing, and overall strategy.
+ 
+Using advanced data analysis techniques based on R programming tools and deep word analysis, we have examined a comprehensive Reddit dataset related to the travel industry. Our goal is to analyze valuable insights and provide accurate recommendations that will be helpful for Pavel Travel Agency and drive them toward success.
+ 
+This report shows a variety of interactive visualizations that highlight key findings from the analysis. These dynamic visuals allow the travel agency to explore the data and better understand the opportunities and challenges of traveling and related opportunities.
+ 
+Tailored specifically to Pavel Travel Agency's objectives, our recommendations aim to drive sales growth, optimize marketing efforts, and refine their overall business strategy for higher customer retention.
+ 
+We invite you to explore the interactive report, engage with the visualizations and consider the recommendations provided to have more accurate and impactful business decisions.
+ 
+Together, let's unlock new opportunities for growth and success for Pavel Travel Agency!
+
+
+
+
+
+## 2. Data Description
+The data used in this report was retrieved from Reddit discussion on travel. Stop words were eliminated to provide words of value for the text minimg analysis. The columns of the data most used include:
+
+- Time period June 08 through July 08, 2023. 
+
+- Subreddit chosen was travel, meaning that all related comments and subreddits appear. 
+
+- Total Awards Received refers to how many individuals found a comment and post insightful or helpful, which is relevant for keyword analysis. 
+
+- Comments refers to the number of comments made on a specific subreddit, which is relevant to understanding discussion trends.  
+
+- Word shows the exact word that will help to analyse discussion trends and find appropriate keywords. 
+
+
+Data Source: Travel, Reddit.  <http://www.reddit.com/r/travel>. (Retrieved July 08, 2023). 
+
+
+
+```{r, echo=FALSE, warnings=FALSE, message=FALSE, fig.width=6, fig.height=4}
+#import libraries
+library(tidyverse)
+library(RedditExtractoR)
+library(tidyverse)
+library(tidytext)
+library(wordcloud)
+library(wordcloud2)
+library(RColorBrewer)
+library(treemap)
+library(plotly)
+library(treemapify)
+library(DT)
+library(hwordcloud)
+```
+
+```{r, echo=FALSE, warnings=FALSE, message=FALSE, fig.width=6, fig.height=4}
+load(file = "travel_20threads.rda")
+```
+
+
+```{r, echo=FALSE, warnings=FALSE, message=FALSE, fig.width=6, fig.height=4}
+# tidy table: text column to unite thread's title, text, and comments
+threads_tbl <- as_tibble(threads_df) %>%
+  unite(title, text, text_comments, col = "text", sep = " ")
+
+# tokenization:
+# unnest_tokens removes punctuation, converts text to lower case
+threads_words <- threads_tbl %>%
+  unnest_tokens(word, text) %>%
+  # omit most rare words: keep those occurring more than 10 times
+  group_by(word) %>%
+  filter(n() > 10) %>%
+  ungroup()
+
+# remove stop words (corpus available within tidytext)
+threads_words_clean <- threads_words %>%
+  filter(!word %in% stop_words$word) %>%
+  filter(!is.na(word))
+
+# term frequency
+threads_words_count <- threads_words_clean %>% count(word, sort = TRUE)
+
+```
+```{r}
+# Create the interactive table
+datatable(threads_words,
+          options = list(pageLength = 10, lengthMenu = c(10, 20, 30), scrollX = TRUE))
+```
+
+```{r, echo=FALSE, warnings=FALSE, message=FALSE, fig.width=6, fig.height=4}
+#tf-idf
+threads_words_tf_idf <- threads_words_clean %>%
+  count(url, word, sort = TRUE) %>%
+  bind_tf_idf(word, url, n) %>%
+  group_by(word) %>% 
+  summarise(tf_idf_sum = sum(tf_idf)) %>%
+  arrange(desc(tf_idf_sum))
+
+top_50_words <- head(threads_words_tf_idf, 50)
+```
+
+
+
+
+
+## 3. Community Discussion 
+
+This section of the report evaluates the general discussion that is occurring on Reddit with regards to travel. Analyzing this helps Pavel Travel understand topics of interest of individuals who are interested in traveling.  
+
+#### *Narrative: Ohio (Cleveland), Airbnb and their hosts as well as magnets are of great importance  in travel discussions.* 
+```{r, echo=FALSE, warnings=FALSE, message=FALSE, fig.width=6, fig.height=4}
+
+hwordcloud::hwordcloud(text = top_50_words$word, size = top_50_words$tf_idf_sum,
+                         width = "100%", heigh = "300px",
+                         theme = "white")
+```
+\tiny{Source: Travel, Reddit.  www.reddit.com/r/travel. (Retrieved July 08, 2023)}
+\tiny{Graph 1}
+
+Insight: A wordcloud was selected since it provides a visually engaging summary of the most frequent words (words that appear most often) in the Reddit dataset. It allows for quick identification of key themes and topics, helping Pavel Travel to understand prevalent discussions and subjects, which in turn enables the agency to focus on customer concerns, competitive advantages, and emerging trends. In this case, these seem to be "magnets", "Cleveland" and "Airbnb". 
+
+
+
+#### *Narrative: Narrowing the discussion data down, Magnets, Cleveland and Airbnb are the most frequently used words in discussions on travel and are also most valued.*
+
+
+```{r, echo=FALSE, warnings=FALSE, message=FALSE, fig.width=6, fig.height=4}
+#treemap
+top_10_words <- head(threads_words_tf_idf, 10)
+
+# Create the treemap graph using plot_ly
+treemap_plot <- plot_ly(top_10_words, type = "treemap",
+                        labels = ~word, parents = "",
+                        values = ~tf_idf_sum)
+
+# Add interactivity to the treemap graph
+treemap_plot %>%
+  layout(title = list(
+    text = "<b>Frequency of the top ten words in discussion on travel relative to the frequency of the whole<b>",
+    font = list(size = 10)  
+  ),
+  hovermode = "closest",
+  annotations = list(
+    list(
+      x = 0.1,  
+      y = -0.05,  
+      text = "Source: Travel, Reddit.  www.reddit.com/r/travel. (Retrieved July 08, 2023)",
+      showarrow = FALSE,  
+      xref = "paper",  
+      yref = "paper"  
+    )
+  ))
+
+```
+\tiny{Graph 2}
+
+Insight: To provide more context for the importance of the most used words, a treemap has been generated, visualizing the relative share of the words used most frequently to the overall frequency. Graph 2 indicates that magnets and Cleveland make up the biggest part, followed by Airbnb, Ohio and host. “Magnets” may be popular due to an increased usage of Air tags used to track one´s luggage. Ohio is a city in Cleveland which explains the combined popularity of these words. A further indicator of why the frequency of these two words is so high is due to Ohio experiencing a record travel that outperforms tourism of the United States.
+
+
+
+
+
+## 4. Keyword Analysis 
+This section of the report aims to evaluate the most promising keywords to improve Pavel Travel´s SEO by analyzing different bigrams. 
+
+### 4.1. Bigram Analysis
+A bigram analysis was conducted to identify the most common pairs of words that appear together in the "travel" subreddit. This analysis can provide insights into common phrases or topics that are frequently discussed in the subreddit. Unlike a single word frequency analysis, a bigram analysis can capture more context, as it considers pairs of words instead of individual words.
+
+#### *Narrative: Two word combinations most frequently used are “street food” and “national park”, whilst certain places like the "Grand Canyon" and countries like "South Africa" are also popular.*
+```{r, echo=FALSE, warnings=FALSE, message=FALSE, fig.width=6, fig.height=4}
+# ngram-analysis: filtering out stopwords
+threads_bigram <- threads_tbl %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word,
+         !is.na(word1)) %>%
+  count(word1, word2, sort = TRUE)
+
+# Select the top 15 bigrams
+top_bigrams <- threads_bigram %>%
+  top_n(15, n) 
+
+# Create the plotly object
+plot <- top_bigrams %>%
+  ggplot(aes(reorder(paste(word1, word2), n), n)) +
+  geom_col(fill = "#E15B5B") +
+  coord_flip() +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_classic(base_size = 12) +
+  labs(title = "Two-word combinations by frequency",
+       x = "Word",
+       y = "Frequency",
+       caption = "Source: Travel, Reddit.  www.reddit.com/r/travel. (Retrieved July 08, 2023")+
+  theme(plot.title = element_text(lineheight = 0.8, face = "bold"),
+       axis.title.x = element_text(margin = margin(t = 50)))
+
+
+# Convert the plot to plotly object
+ggplotly(plot)
+```
+
+\tiny{Source: Travel, Reddit.  www.reddit.com/r/travel. (Retrieved July 08, 2023)}
+\tiny{Graph 3}
+
+Insight: This graph visualizes the words that are mentioned most frequently in a two-word-combination. 
+It reveals a mix of popular travel destinations, activities, and travel-related concerns. For example, "street food" suggests a common interest in local cuisine among travelers. Destinations like "Mexico City", "Hong Kong", "Machu Picchu", "Grand Canyon", "South Africa", "Bora Bora", and "South Korea" indicate popular places that users are discussing or seeking information about. Phrases like "National Park", "Hour Layover", "Tourist Trap", "Road Trip", and "Public Transport" suggest common travel experiences or considerations. The term "Highly Recommend" could be associated with users sharing their positive experiences or giving advice about specific destinations or activities. "Cleaning Fee" might be related to discussions around accommodation and the costs associated with it. "2 Weeks" could be a common time frame for travel plans or vacations. 
+
+These insights can be used to tailor Pavel Travel Agency’s content to match the interests and concerns of their target audience when designing Google Ad and social media campaigns. For instance, Pavel Travel could create content around popular destinations like Mexico City or the Grand Canyon, provide tips for what to do during an hour layover, or share advice on how to avoid tourist traps. Pavel Travel could also focus on topics like street food or national parks, which seem to be of interest to the subreddit users. Understanding these common word combinations can help Pavel Travel Agency create content that is more relevant and engaging to their audience, which could improve their SEO performance.
+
+
+
+#### *Narrative: The most frequently used words in discussions are also amongst the most useful to the users.*
+
+```{r setup, include=FALSE}
+# frequency when total_awards_received is equal to 1
+threads_awards <- threads_tbl %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word,
+         !is.na(word1),
+         !total_awards_received == 1) %>%
+  count(word1, word2, sort = TRUE)
+
+# Select the top 15 threads_awards
+threads_awards <- threads_awards %>%
+  top_n(15, n) 
+```
+
+
+```{r}
+#frequent 2 words when total_awards_received is equal to 1
+
+# Create the plotly object
+plot1 <- threads_awards %>%
+  ggplot(aes(reorder(paste(word1, word2), n), n)) +
+  geom_col(fill = "#E15B5B") +
+  coord_flip() +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_classic(base_size = 12) +
+  labs(title = "Two-word-combinations by frequency and awards",
+       x = "Word",
+       y = "Frequency (Awards)",
+       caption = "Source: Travel, Reddit.  www.reddit.com/r/travel. (Retrieved July 08, 2023")+
+  theme(plot.title = element_text(size = 10,lineheight = 0.8, face = "bold"),
+       axis.title.x = element_text(margin = margin(t = 50)))
+
+
+# Convert the plot to plotly object
+ggplotly(plot1)
+```
+\tiny{Source: Travel, Reddit.  www.reddit.com/r/travel. (Retrieved July 08, 2023)}
+\tiny{Graph 4}
+
+Insight: It is important to also understand which keywords are of value to the users as this indicates that the users are more likely to actively look for these words, which in turn is relevant for SEO improvements. Thus, Graph 4 shows the words that were most frequently mentioned in combination with the number of awards being received. This means that the words used most frequently are also the ones that provide the biggest value to the user. 
+
+
+
+
+
+## 5. Deeper Keyword Analysis 
+Having analyzed the most frequent word combinations which are also most appreciated by Reddit users, a deep dive keyword analysis has been conducted considering competition, bid price as well as monthly search and click volumes to maximize the success of keyword campaigns and thus improving Pavel Travel´s SEO. 
+
+### 5.1. Keyword Category: Country
+As a travel agency, it makes sense to understand where individuals interested in travel would like to go. This can either be on a country level or a city level. In terms of countries, the most appropriate keywords would be **South Africa**, **South Korea** and **Bora Bora**. Further analysis demonstrated that they all have low competition, monthly searches of 100K-1M and a monthly click volume of 86.9K,73.4K and 86.6K respectively. Pavel Travel should be expecting an approximate budget of $688,320 when using these three keywords.
+ 
+### 5.2. Keyword Category: City / Place
+Some travelers may have a more precise idea on which country to travel to and will thus search for specific cities or places within this country. To improve the company's SEO, Pavel Travel should use **Mexico City**, **Hong Kong** and **Grand Canyon** as their keywords. All three have low competition, monthly search volumes of 100K-1M and monthly click volumes of 71.8K, 82.5K and 149K respectively. With that, Pavel Travel should expect an overall budget of $538,220.
+*Please note: The extended keyword analysis demonstrated that three-word-combinations provide too little monthly searches and click volumes and were therefore deemed irrelevant for the purpose of this report.*
+
+
+
+
+
+## 6. Recommendations and Conclusion
+Based on the analysis conducted in this report, Pavel Travel is advised to implement the following recommendations: 
+
+1. Create Google Ad campaigns regarding certain countries and cities. Specifically, Pavel Travel should implement a Google Ads campaign for South Africa, South Korea and Bora Bora, and another one targeting cities and places such as Mexico City, Hong Kong and the Grand Canyon. 
+
+2. Implement social media content that mirrors users interest: Discussion analysis demonstrated that most individuals are talking about travel to Ohio (Cleveland) and Airbnb. Pavel Travel is thus advised to create content on Ohio, including the Rock & Roll Hall and the Cleveland Museum of Art, and promote unique travel experiences as Airbnb does, such as the Amish County. 
+
+3. In case Pavel Travel is currently not promoting Airbnbs in their travel portfolio, they are advised to include them as they are of value to individuals interested in travel. 
+
